@@ -36,7 +36,7 @@ overspend on one payee?"*
    `pay` call per payee across agents and flags team totals over the
    100 per-payee limit without a co-signer. No LLM call here — the
    verdict is a rule over the logs, so it is reproducible and auditable.
-3. **Explain (NVIDIA Nemotron via NIM).** Nemotron-3-Super turns the
+3. **Explain (NVIDIA Nemotron via NIM).** Nemotron-3-Nano turns the
    verdict and the per-agent evidence into a plain-language explanation.
    The LLM explains; it never re-decides.
 
@@ -59,11 +59,15 @@ replayable workflow (the workflow is the asset; replay costs 0 tokens).
   memory in the Gaia style. That is real usage of the product, not a
   stub, and it is documented as such here and in the deck.
 - **NVIDIA.** All LLM calls run on NVIDIA NIM (hosted inference, no GPU
-  needed) using Nemotron-3-Super (`nvidia/nemotron-3-super-120b-a12b`)
+  needed) using Nemotron-3-Nano (`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`)
   via the OpenAI-compatible client. Free tier: 1,000 credits/month, no
   credit card. Set `NVIDIA_API_KEY` (from build.nvidia.com, starts with
-  `nvapi-`). Without a key the judge still decides every episode; the
-  Nemotron explanation is skipped with a clear note.
+  `nvapi-`). Verified live: the key works, the nano reasoning model
+  serves chat completions, and the demo's 6/6 explanations come from it.
+  (The larger Nemotron-3-Super and Llama-Nemotron instruct models return
+  404 on this endpoint for a free-tier key, so the code uses the nano
+  reasoning model.) Without a key the judge still decides every episode;
+  the Nemotron explanation is skipped with a clear note.
 
 ## Setup
 

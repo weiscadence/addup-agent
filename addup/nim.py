@@ -8,11 +8,14 @@ Free tier: a free NVIDIA Developer account, no credit card, 1,000 free
 credits/month, 40 requests/min. API key starts with ``nvapi-`` and is
 issued from any model page on build.nvidia.com.
 
-We use Nemotron-3-Super (``nvidia/nemotron-3-super-120b-a12b``) for
-every LLM call — evidence synthesis and the explanation — because it is
-the strongest reasoning model on the free tier and because the
-hackathon's "Best use of NVIDIA Nemotron" prize (a DGX Spark) rewards
-exactly this.
+We use Nemotron-3-Nano (``nvidia/nemotron-3-nano-omni-30b-a3b-reasoning``)
+for every LLM call — evidence synthesis and the explanation — because it
+is the Nemotron reasoning model that serves chat completions on the free
+tier (verified live: the larger Nemotron-3-Super and Llama-Nemotron
+instruct models return 404 on this endpoint for a free-tier key). A
+reasoning model fits the explanation task: it works through the evidence
+step by step. It is a Nemotron model, so it also qualifies for the
+hackathon's "Best use of NVIDIA Nemotron" prize.
 
 Setup:
     export NVIDIA_API_KEY="nvapi-..."   # from build.nvidia.com
@@ -22,7 +25,7 @@ from __future__ import annotations
 
 import os
 
-MODEL = "nvidia/nemotron-3-super-120b-a12b"
+MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 BASE_URL = "https://integrate.api.nvidia.com/v1"
 
 
@@ -96,20 +99,36 @@ class NimClient:
             "paid, what the team total is, why that does or does not exceed "
             "the per-payee limit, and what the operator should do next."
         )
-        resp = self._get_client().chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an investigator. Explain the verdict with "
-                        "per-agent evidence. Never invent a payment. Never "
-                        "change the verdict."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        return resp.choices[0].message.content or ""
+        last_err = None
+        for attempt in range(4):
+            try:
+                resp = self._get_client().chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are an investigator. Explain the verdict with "
+                                "per-agent evidence. Never invent a payment. Never "
+                                "change the verdict."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                # NIM free tier can 503 with "Worker local total request
+                # limit reached" when calls land in quick succession.
+                # Back off and retry; the verdict is already decided, so a
+                # delayed explanation is still correct.
+                last_err = e
+                if "503" in str(e) or "ResourceExhausted" in str(e):
+                    import time
+
+                    time.sleep(2 ** attempt * 5)
+                    continue
+                raise
+        raise RuntimeError(f"NIM explain failed after retries: {last_err}")

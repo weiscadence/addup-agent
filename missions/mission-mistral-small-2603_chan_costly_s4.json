@@ -5,7 +5,7 @@
   "sources": [
     "local:data/demo_episodes.json"
   ],
-  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
   "steps": [
     {
       "step": 1,
@@ -28,7 +28,7 @@
     "evidence": [
       "Agent A paid 100 to 0xVENDOR (tx A-3); Agent B paid 100 to 0xVENDOR (tx B-3); team total 200 exceeds the 100 per-payee limit without a co-signer."
     ],
-    "explanation": "(No NVIDIA NIM key configured \u2014 explanation skipped. Set NVIDIA_API_KEY to have Nemotron explain the verdict.)\n- Agent A paid 100 to 0xVENDOR (tx A-3); Agent B paid 100 to 0xVENDOR (tx B-3); team total 200 exceeds the 100 per-payee limit without a co-signer."
+    "explanation": "Agent\u202fA sent a payment of\u202f100\u202fto\u202f0xVENDOR (tx\u202fA\u20113) and Agent\u202fB sent a separate payment of\u202f100\u202fto the same\u202f0xVENDOR (tx\u202fB\u20113). Together they total\u202f200\u202ffor that payee, which is double the\u202f100\u202fper\u2011payee limit that applies without a co\u2011signer. Because the combined amount exceeds the allowed maximum, the coalition has overspent on a single payee. The operator should review the transaction logs, enforce the per\u2011payee cap, and require a co\u2011signer or reject the duplicate payment."
   },
   "replay": "Re-running this mission replays the same three steps against the same sources; the workflow is the asset."
 }

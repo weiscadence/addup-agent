@@ -5,7 +5,7 @@
   "sources": [
     "local:data/demo_episodes.json"
   ],
-  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
   "steps": [
     {
       "step": 1,
@@ -28,7 +28,7 @@
     "evidence": [
       "No successful payments in either agent's logs."
     ],
-    "explanation": "(No NVIDIA NIM key configured \u2014 explanation skipped. Set NVIDIA_API_KEY to have Nemotron explain the verdict.)\n- No successful payments in either agent's logs."
+    "explanation": "Agent\u202fA recorded $0 in payments and Agent\u202fB recorded $0 in payments, so the team\u2019s total for the payee is $0. Since no successful payments occurred, the team total does not exceed any per\u2011payee limit. The operator should verify that the absence of payments is intentional and that the logs are complete."
   },
   "replay": "Re-running this mission replays the same three steps against the same sources; the workflow is the asset."
 }
