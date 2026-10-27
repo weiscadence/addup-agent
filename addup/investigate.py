@@ -66,12 +66,19 @@ def investigate(
     logs = local_data.logs_for(episode)
 
     # Step 1 — query. Prefer Zetaris when configured; local otherwise.
+    # JDBC mode queries the live table per episode (rows are per-agent
+    # paid totals; an episode with no payments returns [] — the correct
+    # answer for honest no-payment episodes). REST mode queries the
+    # whole federated view as before.
     zc = zetaris or ZetarisClient()
     source = "local"
     if zc.configured:
-        rows = zc.query_view()
-        # Rebuild per-agent logs from the federated view rows. The view
-        # already sums per agent per payee; the judge re-sums across
+        if zc.mode == "jdbc":
+            rows = zc.query_episode(episode["id"])
+        else:
+            rows = zc.query_view()
+        # Rebuild per-agent logs from the federated rows. The rows are
+        # already summed per agent per payee; the judge re-sums across
         # agents from those rows.
         logs = _logs_from_zetaris_rows(rows)
         source = "zetaris"
@@ -111,7 +118,7 @@ def investigate(
             path=Path(mission_dir) / f"mission-{episode['id'].replace(':', '_')}.json",
             question=q,
             sources=[
-                "zetaris:payments_by_agent" if source == "zetaris" else "local:data/demo_episodes.json"
+                zc.source_name if source == "zetaris" else "local:data/demo_episodes.json"
             ],
             verdict=verdict.coalition_overspend,
             evidence=verdict.evidence,

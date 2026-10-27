@@ -45,13 +45,23 @@ replayable workflow (the workflow is the asset; replay costs 0 tokens).
 
 ## Sponsor integrations (rule 6.4)
 
-- **Zetaris.** Federates the two log sources into one view; the agent
-  queries `payments_by_agent` via the advanced REST API (v5+). Free
-  60-day trial at zetaris.com, or Zetaris Cloud free tier. Set
-  `ZETARIS_API_URL`, `ZETARIS_ORG_ID`, `ZETARIS_API_KEY`.
-  Without credentials the agent runs in local mode on the bundled DUO
-  episodes (`data/demo_episodes.json`) — local mode is for development
-  and the demo only, and is never presented as a Zetaris integration.
+- **Zetaris.** Two paths, one honest split. **JDBC (local instance,
+  verified live 2026-10-27):** the agent connects over the NDP JDBC
+  driver to `jdbc:zetaris:lightning@localhost:10000` and runs the add-up
+  itself per episode on the real table `addup.addup_payments` — `SELECT
+  1` returned `[(1,)]` and the add-up returned exactly the 4 expected
+  rows (three episodes at 200, flagged; one at 100, cleared). Set
+  `ZETARIS_JDBC_JAR` (driver jar, gateway step 8) and
+  `ZETARIS_JDBC_PASSWORD` (gateway step 7 — prompted, hidden, if
+  unset; never in the code). Needs a JVM and `pip install JayDeBeApi`.
+  **REST (advanced API v5+):** the agent queries the federated view
+  `payments_by_agent`; the endpoint shape (`/api/v5/query`) is
+  unverified — the public KB links 404 — and the code raises a clear
+  error on a 404 instead of faking it. Set `ZETARIS_API_URL`,
+  `ZETARIS_ORG_ID`, `ZETARIS_API_KEY`. Without credentials the agent
+  runs in local mode on the bundled DUO episodes
+  (`data/demo_episodes.json`) — local mode is for development and the
+  demo only, and is never presented as a Zetaris integration.
 - **Meterless.** Meterless has no Python SDK and no public API — it is a
   local-first agentic platform (desktop app + runtime). AddUp integrates
   it as the execution environment: every investigation runs as a saved,
@@ -79,6 +89,10 @@ Optional (enable the full integrations):
 
 ```bash
 export NVIDIA_API_KEY="nvapi-..."          # build.nvidia.com, free tier
+# Zetaris via live JDBC (local instance, verified 2026-10-27):
+export ZETARIS_JDBC_JAR="$HOME/zetaris-platform/jdbc/ndp-jdbc-driver-2.4.3.1-7eff043-driver.jar"
+export ZETARIS_JDBC_PASSWORD="..."         # gateway step 7 (or leave unset: prompted, hidden)
+# Zetaris via REST (advanced API v5+, endpoint shape unverified):
 export ZETARIS_API_URL="https://apiservice.trial.enterprise.zetaris.com"
 export ZETARIS_ORG_ID="..."
 export ZETARIS_API_KEY="..."

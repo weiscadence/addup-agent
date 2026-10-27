@@ -7,8 +7,10 @@ Usage:
 Without API keys this runs in local mode (bundled DUO episodes) and the
 judge still decides every episode correctly — the verdict is a rule over
 the logs, not an LLM call. With NVIDIA_API_KEY set, Nemotron explains
-each verdict. With ZETARIS_* set, the payments come from the federated
-Zetaris view instead of the local file.
+each verdict. With ZETARIS_JDBC_JAR set (local instance, JDBC — the
+verified-live path), the payments come from the live Zetaris table
+``addup.addup_payments`` per episode instead of the local file. With
+ZETARIS_API_* set, they come from the federated REST view instead.
 
 Expected output (local mode, no keys):
   3 joint-only episodes  -> COALITION OVERSPEND (correct)
@@ -38,7 +40,10 @@ def main() -> int:
 
     zetaris = ZetarisClient()
     nim = NimClient()
-    print(f"Zetaris: {'configured (federated view)' if zetaris.configured else 'not configured — local mode'}")
+    if zetaris.configured:
+        print(f"Zetaris: configured ({zetaris.mode} — {zetaris.source_name})")
+    else:
+        print("Zetaris: not configured — local mode")
     print(f"NVIDIA NIM: {'configured (Nemotron explains)' if nim.configured else 'not configured — explanation skipped'}")
     print()
 
