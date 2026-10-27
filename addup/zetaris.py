@@ -147,9 +147,12 @@ class ZetarisClient:
             return self._jdbc_password
         import getpass
 
-        return getpass.getpass(
+        # Ask once per run and cache it: the demo queries one episode
+        # at a time, and re-prompting on every episode is noise.
+        self._jdbc_password = getpass.getpass(
             "Zetaris JDBC password (from gateway step 7): "
         )
+        return self._jdbc_password
 
     def query_episode(self, episode_id: str) -> list[dict]:
         """JDBC: per-agent paid totals for one episode, from the live table.
