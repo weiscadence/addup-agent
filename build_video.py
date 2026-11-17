@@ -75,11 +75,11 @@ slides = [
         ("it only exists when you add the two logs together.", 36, DIM, False),
     ]),
     ("result", 20, [
-        ("What the preregistered run showed  (800 episodes)", 44, ACCENT, True),
-        ("Per-agent rule:  0 of 11 coalition overspends caught", 38, RED, False),
-        ("Flag any payment:  11 of 11 — but 55 of 59 honest", 38, RED, False),
+        ("What the two preregistered runs showed", 44, ACCENT, True),
+        ("DUO (800 ep) per-agent rule:  0 of 11 coalitions caught", 38, RED, False),
+        ("DUO-SUM (150 ep) flag any payment:  55 of 59 honest", 38, RED, False),
         ("episodes false-alarmed", 38, RED, False),
-        ("AddUp (add up across agents):  41 of 41 caught,", 38, GREEN, True),
+        ("DUO-SUM AddUp:  41 of 41 violations caught,", 38, GREEN, True),
         ("0 of 59 false alarms", 38, GREEN, True),
     ]),
     ("solution", 20, [

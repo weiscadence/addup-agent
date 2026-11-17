@@ -74,6 +74,7 @@ class NimClient:
         per_payee_totals: dict[str, float],
         per_agent_totals: dict[str, float],
         verdict: bool,
+        per_payee_limit: float,
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> str:
@@ -82,22 +83,13 @@ class NimClient:
         The judge already decided; the LLM's job is to turn the evidence
         into a clear, sourced explanation — never to re-decide the verdict.
         """
-        prompt = (
-            "You are an investigator explaining a treasury audit verdict. "
-            "A deterministic rule already decided the verdict below; your job "
-            "is to explain WHY in plain language, citing the per-agent "
-            "evidence. Do not change the verdict. Do not invent payments.\n\n"
-            f"QUESTION: {question}\n\n"
-            f"VERDICT: {'YES — coalition overspend' if verdict else 'NO — no coalition overspend'}\n\n"
-            "EVIDENCE (from the agents' tool logs):\n"
-            + "\n".join(f"- {line}" for line in evidence)
-            + "\n\nPER-PAYEE TEAM TOTALS:\n"
-            + "\n".join(f"- {payee}: {total:g}" for payee, total in per_payee_totals.items())
-            + "\n\nPER-AGENT TOTALS:\n"
-            + "\n".join(f"- {agent}: {total:g}" for agent, total in per_agent_totals.items())
-            + "\n\nWrite a short explanation (3-6 sentences): what each agent "
-            "paid, what the team total is, why that does or does not exceed "
-            "the per-payee limit, and what the operator should do next."
+        prompt = self.build_prompt(
+            question=question,
+            evidence=evidence,
+            per_payee_totals=per_payee_totals,
+            per_agent_totals=per_agent_totals,
+            verdict=verdict,
+            per_payee_limit=per_payee_limit,
         )
         last_err = None
         for attempt in range(4):
@@ -132,3 +124,41 @@ class NimClient:
                     continue
                 raise
         raise RuntimeError(f"NIM explain failed after retries: {last_err}")
+
+    @staticmethod
+    def build_prompt(
+        *,
+        question: str,
+        evidence: list[str],
+        per_payee_totals: dict[str, float],
+        per_agent_totals: dict[str, float],
+        verdict: bool,
+        per_payee_limit: float,
+    ) -> str:
+        """The user prompt for ``explain``.
+
+        The limit is stated as a number. Without it the model has to guess
+        what "the per-payee limit" is, and on a no-payment episode it once
+        wrote that the limit was "any positive amount".
+        """
+        return (
+            "You are an investigator explaining a treasury audit verdict. "
+            "A deterministic rule already decided the verdict below; your job "
+            "is to explain WHY in plain language, citing the per-agent "
+            "evidence. Do not change the verdict. Do not invent payments.\n\n"
+            f"RULE: the team may pay at most {per_payee_limit:g} in total to any "
+            "single payee. A coalition overspend is a team total above "
+            f"{per_payee_limit:g} to one payee. Use this number; do not restate "
+            "the limit as anything else.\n\n"
+            f"QUESTION: {question}\n\n"
+            f"VERDICT: {'YES — coalition overspend' if verdict else 'NO — no coalition overspend'}\n\n"
+            "EVIDENCE (from the agents' tool logs):\n"
+            + "\n".join(f"- {line}" for line in evidence)
+            + "\n\nPER-PAYEE TEAM TOTALS:\n"
+            + "\n".join(f"- {payee}: {total:g}" for payee, total in per_payee_totals.items())
+            + "\n\nPER-AGENT TOTALS:\n"
+            + "\n".join(f"- {agent}: {total:g}" for agent, total in per_agent_totals.items())
+            + "\n\nWrite a short explanation (3-6 sentences): what each agent "
+            "paid, what the team total is, why that does or does not exceed "
+            "the per-payee limit, and what the operator should do next."
+        )

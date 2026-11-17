@@ -13,8 +13,8 @@ Step 3 — EXPLAIN. NVIDIA Nemotron (via NIM) turns the verdict and the
 per-agent evidence into a plain-language explanation. The LLM explains;
 it never re-decides.
 
-The investigation is saved as a Meterless Nightshift mission so it can be
-replayed step by step.
+The investigation is written out as a Nightshift-mission-shaped JSON file
+(an audit record; see ``addup.meterless``).
 """
 
 from __future__ import annotations
@@ -68,15 +68,16 @@ def investigate(
     # Step 1 — query. Prefer Zetaris when configured; local otherwise.
     # JDBC mode queries the live table per episode (rows are per-agent
     # paid totals; an episode with no payments returns [] — the correct
-    # answer for honest no-payment episodes). REST mode queries the
-    # whole federated view as before.
+    # answer for honest no-payment episodes). REST mode filters the
+    # federated view to the same episode; without that filter every
+    # episode would be judged on the pooled payments of all of them.
     zc = zetaris or ZetarisClient()
     source = "local"
     if zc.configured:
         if zc.mode == "jdbc":
             rows = zc.query_episode(episode["id"])
         else:
-            rows = zc.query_view()
+            rows = zc.query_view(episode_id=episode["id"])
         # Rebuild per-agent logs from the federated rows. The rows are
         # already summed per agent per payee; the judge re-sums across
         # agents from those rows.
@@ -96,6 +97,7 @@ def investigate(
             per_payee_totals=verdict.per_payee_totals,
             per_agent_totals=verdict.per_agent_totals,
             verdict=verdict.coalition_overspend,
+            per_payee_limit=per_payee_limit,
         )
     else:
         explanation = (
@@ -124,6 +126,7 @@ def investigate(
             evidence=verdict.evidence,
             explanation=explanation,
             model=NIM_MODEL,
+            per_payee_limit=per_payee_limit,
         )
     return inv
 

@@ -2,7 +2,8 @@
 
 Zetaris is a data fabric: it federates queries across sources so the
 agent queries ONE view instead of reading files directly. For AddUp the
-two sources are the agents' tool logs and their chat logs.
+sources are the two agents' tool logs. (Chat logs are not read anywhere
+in this repo.)
 
 Two ways the agent talks to Zetaris — JDBC (verified live) and REST
 (endpoint shape unverified, see below).
@@ -23,9 +24,10 @@ JDBC (local instance, VERIFIED LIVE 2026-10-27):
          ZETARIS_JDBC_USER      default admin@zetaris.com
          ZETARIS_JDBC_PASSWORD  from gateway step 7 (prompted, hidden,
                                 if unset — never put it in the code)
-         ZETARIS_JDBC_JAR       path to ndp-jdbc-driver-*.jar (else
-                                searched in ~/Downloads and
-                                ~/zetaris-platform/jdbc)
+         ZETARIS_JDBC_JAR       path to ndp-jdbc-driver-*.jar. If unset,
+                                a jar found in ~/Downloads or
+                                ~/zetaris-platform/jdbc is used only
+                                when ZETARIS_JDBC_PASSWORD is also set
          ZETARIS_TABLE          default addup.addup_payments
 
 REST (advanced API v5+, NOT verified):
@@ -34,6 +36,8 @@ REST (advanced API v5+, NOT verified):
   ``query_view`` uses the documented v5+ advanced-API pattern (POST a
   SQL statement, rows back as JSON) and raises a clear error if the
   endpoint shape differs, instead of silently returning wrong data.
+  The query filters on an ``episode`` column, which the view is assumed
+  to expose (also unverified).
   Env vars: ZETARIS_API_URL, ZETARIS_ORG_ID, ZETARIS_API_KEY,
   ZETARIS_VIEW (default "payments_by_agent").
 
@@ -101,13 +105,18 @@ class ZetarisClient:
         self.jdbc_url = jdbc_url or os.environ.get("ZETARIS_JDBC_URL", JDBC_URL_DEFAULT)
         self.jdbc_user = jdbc_user or os.environ.get("ZETARIS_JDBC_USER", JDBC_USER_DEFAULT)
         self._jdbc_password = jdbc_password or os.environ.get("ZETARIS_JDBC_PASSWORD")
+        # A jar named by argument or env var is an explicit opt-in. One that
+        # merely happens to sit in ~/Downloads is not: on its own it must
+        # not switch the run to JDBC and stop it at a password prompt.
+        self._jdbc_jar_explicit = bool(jdbc_jar or os.environ.get("ZETARIS_JDBC_JAR"))
         self.jdbc_jar = jdbc_jar or _find_jdbc_jar()
         self.table = table or os.environ.get("ZETARIS_TABLE", TABLE_DEFAULT)
         self.timeout = timeout
 
     @property
     def jdbc_configured(self) -> bool:
-        return bool(self.jdbc_url and self.jdbc_user and self.jdbc_jar)
+        opted_in = self._jdbc_jar_explicit or bool(self._jdbc_password)
+        return bool(self.jdbc_url and self.jdbc_user and self.jdbc_jar and opted_in)
 
     @property
     def rest_configured(self) -> bool:
@@ -146,7 +155,14 @@ class ZetarisClient:
         if self._jdbc_password:
             return self._jdbc_password
         import getpass
+        import sys
 
+        if not sys.stdin.isatty():
+            raise ZetarisNotConfigured(
+                "ZETARIS_JDBC_PASSWORD is not set and there is no terminal "
+                "to prompt on. Set it (gateway step 7) or unset "
+                "ZETARIS_JDBC_JAR to run in local mode."
+            )
         # Ask once per run and cache it: the demo queries one episode
         # at a time, and re-prompting on every episode is noise.
         self._jdbc_password = getpass.getpass(
@@ -197,10 +213,24 @@ class ZetarisClient:
         finally:
             conn.close()
 
-    def query_view(self, sql: str | None = None) -> list[dict]:
+    def view_statement(self, episode_id: str) -> str:
+        """REST: per-agent, per-payee totals for ONE episode."""
+        safe_episode = episode_id.replace("'", "''")
+        return (
+            f"SELECT agent, payee, SUM(amount) AS total_paid "
+            f"FROM {self.view} WHERE episode = '{safe_episode}' "
+            f"GROUP BY agent, payee"
+        )
+
+    def query_view(
+        self, sql: str | None = None, *, episode_id: str | None = None
+    ) -> list[dict]:
         """Query the federated payments view and return rows as dicts.
 
-        Default SQL sums payments per payee across agents — the add-up.
+        Pass ``episode_id`` to get one episode's per-agent, per-payee
+        totals (same shape as ``query_episode``), or ``sql`` to run a
+        statement of your own. One of the two is required: an unfiltered
+        default would sum every episode together.
         REST only; JDBC mode uses query_episode instead.
         """
         self.require_configured()
@@ -209,10 +239,12 @@ class ZetarisClient:
                 "query_view is the REST path; JDBC mode uses "
                 "query_episode(episode_id) instead."
             )
-        statement = sql or (
-            f"SELECT agent, payee, SUM(amount) AS total_paid "
-            f"FROM {self.view} GROUP BY agent, payee"
-        )
+        if sql is None and episode_id is None:
+            raise ValueError(
+                "query_view needs episode_id (or an explicit sql statement); "
+                "without it the view would be summed across all episodes."
+            )
+        statement = sql or self.view_statement(episode_id)
         resp = requests.post(
             f"{self.api_url}/api/v5/query",
             json={
